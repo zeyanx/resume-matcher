@@ -20,6 +20,7 @@ from models.tfidf_matcher import calculate_tfidf_similarity
 from utils.feedback_config import FeedbackSettings, load_feedback_settings
 from utils.feedback_store import FeedbackStore, FeedbackStoreError, FeedbackSubmission
 from utils.faircv import FairCVError, fetch_faircv_rows
+from utils.public_text import sanitize_public_resume
 from utils.resume_parser import ResumeParseError, parse_resume_bytes
 from utils.report_exporter import build_text_signature
 from utils.skill_extractor import analyze_skill_gap
@@ -34,7 +35,7 @@ BGE_CACHE_DIR = PROJECT_ROOT / "models_cache" / "huggingface"
 LOCAL_BGE_MODEL_DIR = PROJECT_ROOT / "models_cache" / "bge-small-zh-v1.5"
 DEFAULT_LOCAL_BGE_PATH = str(LOCAL_BGE_MODEL_DIR) if LOCAL_BGE_MODEL_DIR.is_dir() else ""
 DEFAULT_FUSION_CONFIG = load_fusion_weight_config()
-FAIRCV_SANITIZER_VERSION = "2026-10-19-v2"
+FAIRCV_SANITIZER_VERSION = "2026-10-19-v3"
 
 
 @st.cache_resource(show_spinner=False)
@@ -176,7 +177,7 @@ def fetch_example_resume(row_index: int, sanitizer_version: str = FAIRCV_SANITIZ
         raise FairCVError("FairCV 示例连续读取失败，请稍后重试。") from last_error
     if not batch.records or batch.records[0].row_index != row_index:
         raise FairCVError("FairCV 示例行未返回预期记录。")
-    return batch.records[0].matching_text
+    return sanitize_public_resume(batch.records[0].matching_text)
 
 
 def find_example_jd(jd_id: str) -> str:

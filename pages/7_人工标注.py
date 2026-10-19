@@ -13,6 +13,7 @@ import pandas as pd
 import streamlit as st
 
 from utils.faircv import FairCVError, fetch_faircv_rows
+from utils.public_text import sanitize_public_resume
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -24,7 +25,7 @@ LABELS = {
     "2 · 较匹配": "2",
     "3 · 高度匹配": "3",
 }
-FAIRCV_SANITIZER_VERSION = "2026-10-19-v2"
+FAIRCV_SANITIZER_VERSION = "2026-10-19-v3"
 
 
 @st.cache_data(show_spinner=False, ttl=24 * 60 * 60)
@@ -44,7 +45,7 @@ def fetch_resume(row_index: int, sanitizer_version: str = FAIRCV_SANITIZER_VERSI
         raise FairCVError("FairCV 简历连续读取失败，请稍后重试。") from last_error
     if not batch.records or batch.records[0].row_index != row_index:
         raise FairCVError("FairCV 未返回预期的简历记录。")
-    return batch.records[0].matching_text
+    return sanitize_public_resume(batch.records[0].matching_text)
 
 
 def load_rows(raw: bytes) -> list[dict[str, str]]:

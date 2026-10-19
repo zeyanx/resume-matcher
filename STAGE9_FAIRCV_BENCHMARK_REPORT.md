@@ -31,6 +31,6 @@
 - validation/test：60/240
 - BGE 分数范围：0.4296–0.7822
 - TF-IDF 分数范围：0.0000–0.2024
-- 测试：95 passed
+- 测试：97 passed
 
 完整数据说明见 `data/BENCHMARK_CARD.md`。
