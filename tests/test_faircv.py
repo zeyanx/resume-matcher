@@ -54,6 +54,68 @@ def test_remove_protected_content_handles_unsectioned_lines():
     assert "接口开发" in cleaned
 
 
+def test_remove_protected_content_handles_bold_sensitive_sections():
+    raw = """**个人简历**
+
+---
+
+**个人信息**
+
+- 姓名：测试姓名
+- 电话：138-0000-0000
+
+---
+
+**专业技能**
+
+- Python
+
+---
+
+**参考资料**
+
+- 推荐人：张某，联系方式：139-0000-0000
+
+---
+
+**签名**
+
+测试姓名
+"""
+    cleaned = remove_protected_content(raw)
+    assert "Python" in cleaned
+    assert "测试姓名" not in cleaned
+    assert "推荐人" not in cleaned
+    assert "139-0000-0000" not in cleaned
+
+
+def test_remove_protected_content_handles_bracketed_signature_and_inline_declaration():
+    raw = """### 项目经验
+- 模型部署
+
+---
+
+**声明**：以上信息均为模拟内容。
+
+---
+
+**推荐人**
+
+- 推荐人：测试主管
+
+---
+
+**[签名]**
+
+测试姓名
+"""
+    cleaned = remove_protected_content(raw)
+    assert "模型部署" in cleaned
+    assert "模拟内容" not in cleaned
+    assert "测试主管" not in cleaned
+    assert "测试姓名" not in cleaned
+
+
 def test_fetch_uses_bounded_rows_api_request():
     payload_bytes = json.dumps(sample_payload(), ensure_ascii=False).encode("utf-8")
 

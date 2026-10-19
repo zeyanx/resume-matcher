@@ -19,6 +19,7 @@ from models.bge_matcher import load_bge_model  # noqa: E402
 from models.experience_matcher import calculate_experience_match  # noqa: E402
 from models.tfidf_matcher import calculate_tfidf_similarity  # noqa: E402
 from scripts.prepare_matching_benchmark import PAIR_COLUMNS, encode_documents  # noqa: E402
+from utils.faircv import remove_protected_content  # noqa: E402
 from utils.feedback_store import redact_personal_data  # noqa: E402
 from utils.skill_extractor import analyze_skill_gap  # noqa: E402
 
@@ -49,7 +50,9 @@ def main() -> int:
     for line in args.payload.read_text(encoding="utf-8").splitlines():
         item = json.loads(line)
         text = str(item["text"])
-        if item.get("kind") == "jd":
+        if item.get("kind") == "resume":
+            text = remove_protected_content(text)
+        elif item.get("kind") == "jd":
             text = redact_personal_data(text)
         payload[str(item["id"])] = text
     with args.input.open("r", encoding="utf-8-sig", newline="") as handle:

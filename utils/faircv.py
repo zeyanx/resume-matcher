@@ -38,8 +38,14 @@ PERSONAL_SECTION_RE = re.compile(
     r"(?:^|\n)###\s*个人信息\s*.*?(?=\n---\s*(?:\n|$)|\n###\s+|\Z)",
     re.DOTALL,
 )
+SENSITIVE_MARKDOWN_SECTION_RE = re.compile(
+    r"(?:^|\n)---\s*\n+\s*(?:###\s*)?\*{0,2}"
+    r"(?:个人信息|参考资料|推荐信息|推荐人|声明|\[?签名\]?)"
+    r"\*{0,2}\s*(?:[：:].*)?\n.*?(?=\n---\s*(?:\n|$)|\Z)",
+    re.DOTALL,
+)
 PROTECTED_LINE_RE = re.compile(
-    r"^\s*[-*]?\s*\*{0,2}(?:姓名|年龄|性别|婚姻状况|户口地|身体状况|政治面貌|邮箱|电话)"
+    r"^\s*[-*]?\s*\*{0,2}(?:姓名|年龄|性别|婚姻状况|户口地|身体状况|政治面貌|邮箱|电话|联系方式|推荐人|声明)"
     r"\*{0,2}\s*[：:].*$",
     re.MULTILINE,
 )
@@ -67,7 +73,8 @@ class FairCVBatch:
 
 def remove_protected_content(content: str) -> str:
     """从进入匹配器的文本中移除个人信息区和常见身份字段。"""
-    cleaned = PERSONAL_SECTION_RE.sub("\n### 个人信息\n[已从匹配输入中移除]\n", str(content))
+    cleaned = SENSITIVE_MARKDOWN_SECTION_RE.sub("\n---\n", str(content))
+    cleaned = PERSONAL_SECTION_RE.sub("\n### 个人信息\n[已从匹配输入中移除]\n", cleaned)
     cleaned = PROTECTED_LINE_RE.sub("", cleaned)
     cleaned = redact_personal_data(cleaned)
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned).strip()
