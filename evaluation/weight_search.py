@@ -9,6 +9,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from statistics import fmean
 
+from scipy.stats import spearmanr
+
 from models.fusion_matcher import FusionWeights, calculate_fusion_score
 
 
@@ -55,6 +57,7 @@ class WeightEvaluation:
     weights: FusionWeights
     split: str
     count: int
+    spearman: float | None
     mae: float
     rmse: float
 
@@ -83,6 +86,14 @@ def load_labeled_cases(path: str | Path) -> tuple[LabeledScoreCase, ...]:
 
     cases: list[LabeledScoreCase] = []
     for line_number, row in enumerate(rows, start=2):
+        if not str(row.get("relevance_label", "")).strip():
+            raise ValueError(f"权重实验数据第 {line_number} 行尚未完成人工标注。")
+        label_status = str(row.get("label_status", "")).strip()
+        if label_status and label_status not in {"human_labeled", "human_adjudicated"}:
+            raise ValueError(
+                f"权重实验数据第 {line_number} 行 label_status={label_status}，"
+                "只有真人标注可用于调参。"
+            )
         try:
             cases.append(
                 LabeledScoreCase(
@@ -136,6 +147,8 @@ def evaluate_weights(
         raise ValueError(f"没有可用的 {split} 数据。")
     errors: list[float] = []
     squared_errors: list[float] = []
+    labels: list[float] = []
+    predictions: list[float] = []
     for case in selected:
         prediction = calculate_fusion_score(
             case.semantic_score,
@@ -146,10 +159,18 @@ def evaluate_weights(
         error = prediction - case.normalized_label
         errors.append(abs(error))
         squared_errors.append(error * error)
+        labels.append(case.normalized_label)
+        predictions.append(prediction)
+    correlation = None
+    if len(set(labels)) > 1 and len(set(predictions)) > 1:
+        statistic = float(spearmanr(labels, predictions).statistic)
+        if math.isfinite(statistic):
+            correlation = statistic
     return WeightEvaluation(
         weights=weights,
         split=split,
         count=len(selected),
+        spearman=correlation,
         mae=fmean(errors),
         rmse=math.sqrt(fmean(squared_errors)),
     )
@@ -159,7 +180,7 @@ def run_weight_grid_search(
     cases: tuple[LabeledScoreCase, ...],
     step: float = 0.1,
 ) -> WeightSearchResult:
-    """仅按验证集 MAE 选择权重，再在测试集上评估一次。"""
+    """仅按验证集 Spearman 选择权重，再在测试集上评估一次。"""
     validation_count = sum(case.split == "validation" for case in cases)
     test_count = sum(case.split == "test" for case in cases)
     if validation_count < 2 or test_count < 1:
@@ -172,6 +193,7 @@ def run_weight_grid_search(
     best = min(
         comparisons,
         key=lambda item: (
+            -(item.spearman if item.spearman is not None else -1.0),
             item.mae,
             item.rmse,
             abs(item.weights.semantic - default.semantic)
@@ -185,7 +207,16 @@ def run_weight_grid_search(
     return WeightSearchResult(
         best_validation=best,
         test_evaluation=test_evaluation,
-        comparisons=tuple(sorted(comparisons, key=lambda item: (item.mae, item.rmse))),
+        comparisons=tuple(
+            sorted(
+                comparisons,
+                key=lambda item: (
+                    -(item.spearman if item.spearman is not None else -1.0),
+                    item.mae,
+                    item.rmse,
+                ),
+            )
+        ),
         step=step,
         data_statuses=tuple(sorted({case.data_status for case in cases})),
     )
@@ -204,20 +235,25 @@ def save_weight_search_result(
     summary = {
         "weights": asdict(result.best_validation.weights),
         "selection_split": "validation",
-        "selection_metric": "MAE",
+        "selection_metric": "Spearman（并列时依次比较 MAE、RMSE）",
         "validation": {
             "count": result.best_validation.count,
+            "spearman": result.best_validation.spearman,
             "mae": result.best_validation.mae,
             "rmse": result.best_validation.rmse,
         },
         "test": {
             "count": result.test_evaluation.count,
+            "spearman": result.test_evaluation.spearman,
             "mae": result.test_evaluation.mae,
             "rmse": result.test_evaluation.rmse,
         },
         "grid_step": result.step,
         "data_statuses": list(result.data_statuses),
-        "warning": "若 data_statuses 含 synthetic_demo，本结果只验证实验流程，不代表真实性能或生产最优权重。",
+        "warning": (
+            "synthetic_demo 只验证流程；FairCV 人工标注结果也只代表合成简历与固定 JD 样本，"
+            "不代表真实招聘准确率或生产最优权重。"
+        ),
     }
     summary_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
 
@@ -230,6 +266,7 @@ def save_weight_search_result(
                 "skill_weight",
                 "experience_weight",
                 "validation_count",
+                "validation_spearman",
                 "validation_mae",
                 "validation_rmse",
             ],
@@ -243,6 +280,7 @@ def save_weight_search_result(
                     "skill_weight": evaluation.weights.skill,
                     "experience_weight": evaluation.weights.experience,
                     "validation_count": evaluation.count,
+                    "validation_spearman": evaluation.spearman,
                     "validation_mae": evaluation.mae,
                     "validation_rmse": evaluation.rmse,
                 }

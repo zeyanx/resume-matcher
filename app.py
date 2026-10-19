@@ -1,6 +1,9 @@
 """ResumeMatcher 最终版：匹配、建议、报告、评估与可视化。"""
 
+import csv
+import json
 from pathlib import Path
+import time
 
 import plotly.graph_objects as go
 import streamlit as st
@@ -16,6 +19,7 @@ from models.fusion_matcher import (
 from models.tfidf_matcher import calculate_tfidf_similarity
 from utils.feedback_config import FeedbackSettings, load_feedback_settings
 from utils.feedback_store import FeedbackStore, FeedbackStoreError, FeedbackSubmission
+from utils.faircv import FairCVError, fetch_faircv_rows
 from utils.resume_parser import ResumeParseError, parse_resume_bytes
 from utils.report_exporter import build_text_signature
 from utils.skill_extractor import analyze_skill_gap
@@ -24,6 +28,8 @@ from utils.skill_extractor import analyze_skill_gap
 PROJECT_ROOT = Path(__file__).resolve().parent
 SAMPLE_RESUME_PATH = PROJECT_ROOT / "data" / "sample_resumes" / "sample_resume.txt"
 SAMPLE_JD_PATH = PROJECT_ROOT / "data" / "sample_jds" / "sample_python_backend.txt"
+FAIRCV_EXAMPLES_PATH = PROJECT_ROOT / "data" / "sample_resumes" / "faircv_examples.json"
+TEST_CASES_PATH = PROJECT_ROOT / "data" / "test_cases.csv"
 BGE_CACHE_DIR = PROJECT_ROOT / "models_cache" / "huggingface"
 LOCAL_BGE_MODEL_DIR = PROJECT_ROOT / "models_cache" / "bge-small-zh-v1.5"
 DEFAULT_LOCAL_BGE_PATH = str(LOCAL_BGE_MODEL_DIR) if LOCAL_BGE_MODEL_DIR.is_dir() else ""
@@ -143,10 +149,54 @@ def load_style() -> None:
         st.markdown(f"<style>{style_path.read_text(encoding='utf-8')}</style>", unsafe_allow_html=True)
 
 
-def load_example() -> None:
-    """将合成示例载入会话状态，方便课堂答辩快速演示。"""
-    st.session_state["resume_text"] = SAMPLE_RESUME_PATH.read_text(encoding="utf-8")
-    st.session_state["jd_text"] = SAMPLE_JD_PATH.read_text(encoding="utf-8")
+def load_example_catalog() -> tuple[dict[str, object], ...]:
+    """读取仅含 FairCV 源行号和展示元数据的示例目录。"""
+    if not FAIRCV_EXAMPLES_PATH.is_file():
+        return ()
+    payload = json.loads(FAIRCV_EXAMPLES_PATH.read_text(encoding="utf-8"))
+    return tuple(item for item in payload if isinstance(item, dict))
+
+
+@st.cache_data(show_spinner=False, ttl=24 * 60 * 60)
+def fetch_example_resume(row_index: int) -> str:
+    """按源行号读取 FairCV，并沿用受保护字段移除逻辑。"""
+    last_error: Exception | None = None
+    batch = None
+    for attempt in range(3):
+        try:
+            batch = fetch_faircv_rows(offset=row_index, length=1, timeout_seconds=20)
+            break
+        except FairCVError as exc:
+            last_error = exc
+            if attempt < 2:
+                time.sleep(attempt + 1)
+    if batch is None:
+        raise FairCVError("FairCV 示例连续读取失败，请稍后重试。") from last_error
+    if not batch.records or batch.records[0].row_index != row_index:
+        raise FairCVError("FairCV 示例行未返回预期记录。")
+    return batch.records[0].matching_text
+
+
+def find_example_jd(jd_id: str) -> str:
+    """从固定测试集找到示例对应的公开 JD。"""
+    if not TEST_CASES_PATH.is_file():
+        return SAMPLE_JD_PATH.read_text(encoding="utf-8")
+    with TEST_CASES_PATH.open("r", encoding="utf-8-sig", newline="") as handle:
+        for row in csv.DictReader(handle):
+            if row.get("jd_id") == jd_id:
+                return row.get("jd_text", "").strip()
+    return SAMPLE_JD_PATH.read_text(encoding="utf-8")
+
+
+def load_example(example: dict[str, object] | None = None) -> None:
+    """将 FairCV 合成简历和对应公开 JD 载入会话状态。"""
+    if example is None:
+        st.session_state["resume_text"] = SAMPLE_RESUME_PATH.read_text(encoding="utf-8")
+        st.session_state["jd_text"] = SAMPLE_JD_PATH.read_text(encoding="utf-8")
+    else:
+        resume = fetch_example_resume(int(example["source_row_index"]))
+        st.session_state["resume_text"] = resume
+        st.session_state["jd_text"] = find_example_jd(str(example["default_jd_id"]))
     st.session_state.pop("resume_file_info", None)
 
 
@@ -164,7 +214,26 @@ def main() -> None:
             "支持 PDF、DOCX、TXT。匹配时内容仅在当前会话中处理；"
             "只有用户在反馈区单独明确授权后，才可能保存脱敏文本。"
         )
-        st.button("载入合成示例", on_click=load_example, use_container_width=True)
+        examples = load_example_catalog()
+        if examples:
+            selected_example = st.selectbox(
+                "FairCV 合成示例",
+                options=examples,
+                format_func=lambda item: str(item.get("label", item.get("id", "示例"))),
+            )
+            if st.button("加载示例简历与 JD", use_container_width=True):
+                try:
+                    with st.spinner("正在读取 FairCV 合成示例……"):
+                        load_example(selected_example)
+                except (FairCVError, OSError, ValueError) as exc:
+                    load_example()
+                    st.warning(f"FairCV 暂时不可用，已加载内置离线示例：{exc}")
+                else:
+                    st.success("已加载合成简历与公开 JD。")
+            st.button("载入内置离线示例", on_click=load_example, use_container_width=True)
+        else:
+            st.button("载入内置离线示例", on_click=load_example, use_container_width=True)
+        st.caption("示例简历来自 FairCV 合成数据，仅用于课程演示，不代表真实求职者。")
         st.divider()
         st.subheader("BGE 模型")
         enable_bge = st.toggle("启用 BGE 语义匹配", value=True)

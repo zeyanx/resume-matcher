@@ -18,7 +18,7 @@ def test_example_matching_flow() -> None:
         False
     ).run()
 
-    next(button for button in app.button if button.label == "载入合成示例").click().run()
+    next(button for button in app.button if button.label == "载入内置离线示例").click().run()
     assert "Python 后端开发实习生" in app.text_area[0].value
     assert "岗位职责" in app.text_area[1].value
 

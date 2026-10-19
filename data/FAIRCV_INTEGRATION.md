@@ -1,5 +1,7 @@
 # FairCV 基础数据接入说明
 
+> 配对基准、人工标注和权重实验的最新说明见 `data/BENCHMARK_CARD.md`。
+
 来源：https://huggingface.co/datasets/OhMyKing/FairCV
 
 FairCV 是用于简历筛选偏见研究的中文模拟简历数据集。数据卡当前报告约 144 万条记录、约 6.32 GB，

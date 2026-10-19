@@ -110,6 +110,15 @@ python scripts\run_weight_experiment.py `
 
 ## 评估实验
 
+### FairCV + 公开中文 JD 待标注基准
+
+`data/test_cases.csv` 包含 60 份 FairCV 合成简历、300 条公开中文 JD 和 300 个固定配对，
+按简历查询分组为 20% validation / 80% test。四项模型子分数已真实计算，但人工标签仍为空，
+因此不会生成正式指标或最优权重。请在“人工标注”页面完成 0–3 标签，下载 CSV 后再运行评估。
+详细来源、许可、标注规则和复现命令见 `data/BENCHMARK_CARD.md`。
+
+首页提供 5 份 FairCV 合成示例的一键加载入口。仓库只保存源行号，页面运行时读取简历并移除个人及受保护字段。
+
 完整评估入口：
 
 ```powershell
@@ -123,7 +132,7 @@ python evaluation\evaluate.py `
 
 评估代码支持 Pearson、Spearman、NDCG@5、MRR、Accuracy、Precision、Recall、F1、MAE、RMSE，以及 TF-IDF、BGE、融合评分、去除技能后的融合模型对比。还支持验证集权重搜索、消融、分类别结果、错误案例和 PNG 图表。
 
-当前仓库没有真实人工标注数据。输入文件标记为 `synthetic_demo` 时，程序会拒绝生成相关性、排序、分类指标和指标图，只输出空白字段模板、流程摘要及明确标记的权重搜索演示。`reports/stage7_synthetic_demo/run_summary.json` 中固定记录 `metrics_generated=false` 和“尚未形成有效实验结论”。
+当前仓库还没有已完成的真人相关性标签。输入文件标记为 `synthetic_demo` 时，程序会拒绝生成相关性、排序、分类指标和指标图；`data/test_cases.csv` 的 `pending_human` 行也会在读取阶段被拒绝。只有通过人工标注页面生成的 `human_labeled` / `human_adjudicated` 文件才可进入正式评估。
 
 ## 运行测试
 

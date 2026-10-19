@@ -109,6 +109,14 @@ def load_evaluation_cases(path: str | Path) -> tuple[EvaluationCase, ...]:
 
     cases: list[EvaluationCase] = []
     for line_number, row in enumerate(rows, start=2):
+        if not str(row.get("relevance_label", "")).strip():
+            raise ValueError(f"评估数据第 {line_number} 行尚未完成人工标注。")
+        label_status = str(row.get("label_status", "")).strip()
+        if label_status and label_status not in {"human_labeled", "human_adjudicated"}:
+            raise ValueError(
+                f"评估数据第 {line_number} 行 label_status={label_status}，"
+                "只有真人标注可用于正式评估。"
+            )
         try:
             cases.append(
                 EvaluationCase(
@@ -272,6 +280,7 @@ def _save_weight_search(path: Path, comparisons: tuple[object, ...]) -> None:
                 "skill_weight",
                 "experience_weight",
                 "validation_count",
+                "validation_spearman",
                 "validation_mae",
                 "validation_rmse",
             ]
@@ -284,6 +293,7 @@ def _save_weight_search(path: Path, comparisons: tuple[object, ...]) -> None:
                     item.weights.skill,
                     item.weights.experience,
                     item.count,
+                    item.spearman,
                     item.mae,
                     item.rmse,
                 ]
@@ -465,7 +475,7 @@ def run_evaluation(
         "weights": asdict(weights) if metrics_generated else None,
         "demo_grid_search_weights": asdict(weights) if has_synthetic_data else None,
         "selected_on": "validation",
-        "selection_metric": "MAE",
+        "selection_metric": "Spearman（并列时依次比较 MAE、RMSE）",
         "weight_step": weight_step,
         "classification_threshold": classification_threshold,
         "random_seed": seed,

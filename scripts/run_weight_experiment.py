@@ -38,6 +38,10 @@ def main() -> None:
         f"skill={best.weights.skill:.2f}, "
         f"experience={best.weights.experience:.2f}"
     )
+    print(
+        "验证集 Spearman："
+        + (f"{best.spearman:.4f}" if best.spearman is not None else "不可计算")
+    )
     print(f"数据状态：{', '.join(result.data_statuses)}")
     print(f"最佳权重文件：{summary_path}")
     print(f"权重对比文件：{comparison_path}")

@@ -1,0 +1,42 @@
+[
+  {
+    "id": "faircv-131503",
+    "label": "前端开发工程师（高级）",
+    "source_row_index": 131503,
+    "position": "前端开发工程师",
+    "skill_level": "高",
+    "default_jd_id": "jd-6094"
+  },
+  {
+    "id": "faircv-160402",
+    "label": "Android开发工程师（极低级）",
+    "source_row_index": 160402,
+    "position": "Android开发工程师",
+    "skill_level": "极低",
+    "default_jd_id": "jd-18955"
+  },
+  {
+    "id": "faircv-517406",
+    "label": "计算机视觉工程师（低级）",
+    "source_row_index": 517406,
+    "position": "计算机视觉工程师",
+    "skill_level": "低",
+    "default_jd_id": "jd-3313"
+  },
+  {
+    "id": "faircv-302902",
+    "label": "iOS开发工程师（高级）",
+    "source_row_index": 302902,
+    "position": "iOS开发工程师",
+    "skill_level": "高",
+    "default_jd_id": "jd-20301"
+  },
+  {
+    "id": "faircv-1189107",
+    "label": "DevOps架构师（极高级）",
+    "source_row_index": 1189107,
+    "position": "DevOps架构师",
+    "skill_level": "极高",
+    "default_jd_id": "jd-22360"
+  }
+]
