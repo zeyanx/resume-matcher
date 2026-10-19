@@ -19,6 +19,7 @@ reports/*
 
 # 本地敏感数据
 data/private/
+data/external/
 *.log
 .streamlit/secrets.toml
 *.db

@@ -21,6 +21,7 @@ EXCLUDED_DIRECTORIES = {
     "__pycache__",
     "models_cache",
     "private",
+    "external",
 }
 EXCLUDED_SUFFIXES = {".pyc", ".pyo", ".log"}
 EXCLUDED_FILES = {".env", ".streamlit/secrets.toml"}
@@ -41,9 +42,13 @@ REQUIRED_PATHS = {
     "pages/3_简历优化建议.py",
     "pages/4_评估实验.py",
     "pages/5_数据与隐私.py",
+    "pages/6_基础数据与公平性.py",
     "evaluation/evaluate.py",
+    "scripts/prepare_faircv_baseline.py",
     "utils/feedback_config.py",
     "utils/feedback_store.py",
+    "utils/faircv.py",
+    "data/FAIRCV_INTEGRATION.md",
     "PRIVACY.md",
     "DEPLOYMENT.md",
     "THESIS_OUTLINE.md",

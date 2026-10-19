@@ -4,7 +4,7 @@
 
 公开演示：https://resume-matcher-zeyanx.streamlit.app/
 
-当前公开演示已开放匹配、技能差距、优化建议、评估实验和数据隐私页面。服务器端反馈收集在
+当前公开演示已开放匹配、技能差距、优化建议、评估实验、FairCV 基础数据审计和数据隐私页面。服务器端反馈收集在
 配置持久化 PostgreSQL 与真实隐私联系人之前保持关闭。
 
 阶段 0–8 已完成：上传 PDF、DOCX 或 TXT 简历，预览解析文本，输入岗位 JD，同时计算 TF-IDF 基线、`BAAI/bge-small-zh-v1.5` 语义匹配度、岗位技能覆盖率、经历关键词覆盖率和三特征融合评分。独立页面提供技能差距分析、3–5 条证据化优化建议、Markdown/TXT 报告导出，以及可复现的评估流程与结果页面。
@@ -14,6 +14,7 @@
 - `INSTALL.md`：安装、模型准备、运行和故障处理；
 - `DEMO_GUIDE.md`：合成数据状态、四个页面和演示流程；
 - `data/DATA_CARD.md`：数据来源与证据边界；
+- `data/FAIRCV_INTEGRATION.md`：FairCV 学术数据的许可、抽样和敏感字段隔离规则；
 - `THESIS_OUTLINE.md`：课程论文大纲；
 - `EXPERIMENT_CHAPTER_MATERIAL.md`：实验章节方法、待填结果表和有效性威胁；
 - `DEFENSE_DEMO_SCRIPT.md`：一分钟答辩演示脚本；
@@ -154,6 +155,21 @@ CONSENT_VERSION = "2026-10-19-v1"
 删除码。管理员先运行 `scripts/review_feedback.py` 人工审核；`scripts/learn_from_feedback.py` 只读取
 审核通过且子分数完整的记录，至少 30 条才生成候选权重，并且不会自动覆盖线上配置。
 
+## FairCV 基础数据
+
+项目可按需读取 [OhMyKing/FairCV](https://huggingface.co/datasets/OhMyKing/FairCV) 作为课程研究中的
+公平性审计和鲁棒性测试基础数据。该数据是模拟生成的，数据卡声明仅限学术研究并禁止商业用途；
+它包含年龄、性别、户口、婚姻、政治面貌和残障等敏感属性，且没有真实录用标签。
+
+因此本项目不会用 FairCV 直接学习融合权重。敏感属性仅保留在独立的聚合审计通道，进入匹配器前会从
+文本中删除。完整数据不写入仓库或线上容器。离线可复现抽样命令：
+
+```powershell
+python scripts\prepare_faircv_baseline.py --sample-size 500 --seed 42
+```
+
+输出保存在被 Git 忽略的 `data/external/faircv/`。公开页面每次最多临时读取 100 条，只显示聚合计数。
+
 这里直接调用环境中的 Python，可以避开部分中文 Windows 终端中 `conda run` 回显 UTF-8 测试输出时发生的 GBK 编码错误。
 
 ## 打包
@@ -184,4 +200,5 @@ python scripts\package_project.py --output ResumeMatcher_final.zip
 - 正式评估指标只有在数据不含 `synthetic_demo` 状态时才会落盘；真实数据必须保持验证集和测试集隔离。
 - TF-IDF 分数表示词项相似度，不代表录用概率。
 - 示例简历和示例 JD 均为合成数据，不代表真实个人或企业。
+- FairCV 仅用于学术公平性审计和鲁棒性测试，不是人工相关性标签或真实性能证据。
 - 普通匹配不会保存用户上传的简历正文；只有部署者开启研究文本选项且用户单独授权时，才保存自动脱敏文本。
