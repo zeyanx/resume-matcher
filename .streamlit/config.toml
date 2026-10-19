@@ -3,6 +3,8 @@ gatherUsageStats = false
 
 [server]
 headless = true
+# 生产部署不需要源码热更新；关闭监视器可避免其遍历 Transformers 的可选视觉模块。
+fileWatcherType = "none"
 
 [theme]
 primaryColor = "#335CFF"
