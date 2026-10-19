@@ -1,0 +1,13 @@
+case_id,split,relevance_label,semantic_score,skill_score,experience_score,data_status
+demo_val_001,validation,3,0.92,0.90,0.85,synthetic_demo
+demo_val_002,validation,3,0.88,0.95,0.80,synthetic_demo
+demo_val_003,validation,2,0.74,0.70,0.62,synthetic_demo
+demo_val_004,validation,2,0.68,0.76,0.58,synthetic_demo
+demo_val_005,validation,1,0.46,0.35,0.42,synthetic_demo
+demo_val_006,validation,1,0.38,0.45,0.30,synthetic_demo
+demo_val_007,validation,0,0.12,0.05,0.15,synthetic_demo
+demo_val_008,validation,0,0.18,0.10,0.08,synthetic_demo
+demo_test_001,test,3,0.90,0.88,0.82,synthetic_demo
+demo_test_002,test,2,0.70,0.66,0.60,synthetic_demo
+demo_test_003,test,1,0.40,0.38,0.32,synthetic_demo
+demo_test_004,test,0,0.14,0.08,0.12,synthetic_demo

@@ -1,0 +1,30 @@
+# ResumeMatcher：Python 3.10 兼容的阶段 0 依赖基线
+# 说明：这些版本用于建立可复现环境；阶段 1 安装后会再执行依赖冲突检查。
+
+# Web 界面与交互式可视化
+streamlit==1.64.0
+plotly==6.3.1
+matplotlib==3.10.7
+
+# 文档解析与中文文本处理
+PyMuPDF==1.26.5
+python-docx==1.2.0
+jieba==0.42.1
+
+# 数据处理、传统机器学习与评估
+numpy==2.2.6
+pandas==2.3.3
+scipy==1.15.3
+scikit-learn==1.7.2
+
+# 用户明确授权后的反馈存储（生产环境使用远程 PostgreSQL）
+SQLAlchemy>=2.0,<3.0
+psycopg2-binary>=2.9,<3.0
+
+# BGE 语义向量（CPU 环境也可运行）
+torch==2.10.0
+transformers==5.17.0
+sentence-transformers==6.1.0
+
+# 测试
+pytest==8.4.2

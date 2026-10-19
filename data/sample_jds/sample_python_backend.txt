@@ -1,0 +1,3 @@
+【合成示例岗位】Python 后端开发实习生
+岗位职责：参与 Web 后端接口开发、数据库设计、接口测试和项目文档维护。
+任职要求：熟悉 Python，掌握 Flask 或 Django；熟悉 MySQL 和 Git；了解 RESTful API、Linux、Docker；具备良好的沟通与协作能力。

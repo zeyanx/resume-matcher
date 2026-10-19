@@ -1,0 +1,33 @@
+{
+  "version": "1.0.0",
+  "description": "用于经历或职责关键词覆盖分析的项目自编词典，不包含工作年限推断。",
+  "keywords": [
+    {"canonical": "软件开发", "category": "工程活动", "aliases": ["软件开发", "开发", "研发", "software development"]},
+    {"canonical": "系统设计", "category": "工程活动", "aliases": ["系统设计", "架构设计", "system design", "architecture design"]},
+    {"canonical": "接口开发", "category": "工程活动", "aliases": ["接口开发", "api 开发", "api development"]},
+    {"canonical": "数据库设计", "category": "工程活动", "aliases": ["数据库设计", "数据建模", "database design"]},
+    {"canonical": "测试", "category": "工程活动", "aliases": ["测试", "testing", "test"]},
+    {"canonical": "维护", "category": "工程活动", "aliases": ["维护", "maintenance"]},
+    {"canonical": "部署", "category": "工程活动", "aliases": ["部署", "deployment", "deploy"]},
+    {"canonical": "性能优化", "category": "工程活动", "aliases": ["性能优化", "优化", "performance optimization"]},
+    {"canonical": "数据分析", "category": "分析活动", "aliases": ["数据分析", "分析数据", "data analysis"]},
+    {"canonical": "建模", "category": "分析活动", "aliases": ["建模", "modeling", "modelling"]},
+    {"canonical": "监控", "category": "运维活动", "aliases": ["监控", "monitoring"]},
+    {"canonical": "问题排查", "category": "运维活动", "aliases": ["问题排查", "故障排查", "troubleshooting", "debugging"]},
+    {"canonical": "文档", "category": "协作活动", "aliases": ["项目文档", "技术文档", "文档维护", "documentation"]},
+    {"canonical": "沟通", "category": "协作活动", "aliases": ["沟通", "communication"]},
+    {"canonical": "团队协作", "category": "协作活动", "aliases": ["团队协作", "跨团队协作", "teamwork", "collaboration"]},
+    {"canonical": "需求分析", "category": "产品活动", "aliases": ["需求分析", "需求梳理", "requirements analysis"]},
+    {"canonical": "用户研究", "category": "产品活动", "aliases": ["用户研究", "用户调研", "user research"]},
+    {"canonical": "项目管理", "category": "管理活动", "aliases": ["项目管理", "project management"]},
+    {"canonical": "自动化", "category": "工程活动", "aliases": ["自动化", "automation"]},
+    {"canonical": "内容运营", "category": "运营活动", "aliases": ["内容运营", "内容策划", "content operation"]},
+    {"canonical": "营销推广", "category": "运营活动", "aliases": ["营销推广", "市场推广", "promotion", "marketing"]},
+    {"canonical": "本科", "category": "教育要求", "aliases": ["本科", "学士", "bachelor"]},
+    {"canonical": "硕士", "category": "教育要求", "aliases": ["硕士", "研究生", "master degree"]},
+    {"canonical": "博士", "category": "教育要求", "aliases": ["博士", "phd", "doctorate"]},
+    {"canonical": "计算机相关专业", "category": "教育要求", "aliases": ["计算机相关专业", "计算机专业", "计算机科学", "computer science"]},
+    {"canonical": "实习经历", "category": "经历类型", "aliases": ["实习经历", "实习经验", "internship"]},
+    {"canonical": "项目经历", "category": "经历类型", "aliases": ["项目经历", "项目经验", "project experience"]}
+  ]
+}

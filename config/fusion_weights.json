@@ -1,0 +1,11 @@
+{
+  "version": "1.0.0",
+  "weights": {
+    "semantic": 0.5,
+    "skill": 0.3,
+    "experience": 0.2
+  },
+  "source": "界面初始展示值，未经真实人工标注验证",
+  "validated": false,
+  "note": "不得描述为最优权重。真实权重需仅在验证集上选择，并在隔离测试集上一次性评估。"
+}
