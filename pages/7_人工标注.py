@@ -24,10 +24,12 @@ LABELS = {
     "2 · 较匹配": "2",
     "3 · 高度匹配": "3",
 }
+FAIRCV_SANITIZER_VERSION = "2026-10-19-v2"
 
 
 @st.cache_data(show_spinner=False, ttl=24 * 60 * 60)
-def fetch_resume(row_index: int) -> str:
+def fetch_resume(row_index: int, sanitizer_version: str = FAIRCV_SANITIZER_VERSION) -> str:
+    del sanitizer_version  # 仅用于让 Streamlit 在清洗规则升级后失效旧缓存。
     last_error: Exception | None = None
     batch = None
     for attempt in range(3):
@@ -119,7 +121,9 @@ def main() -> None:
 
     try:
         with st.spinner("正在读取 FairCV 合成简历……"):
-            resume_text = fetch_resume(int(row["resume_source_row_index"]))
+            resume_text = fetch_resume(
+                int(row["resume_source_row_index"]), FAIRCV_SANITIZER_VERSION
+            )
     except (FairCVError, ValueError) as exc:
         st.error(f"无法读取这份 FairCV 简历：{exc}")
         resume_text = ""

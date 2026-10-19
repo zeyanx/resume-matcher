@@ -34,6 +34,7 @@ BGE_CACHE_DIR = PROJECT_ROOT / "models_cache" / "huggingface"
 LOCAL_BGE_MODEL_DIR = PROJECT_ROOT / "models_cache" / "bge-small-zh-v1.5"
 DEFAULT_LOCAL_BGE_PATH = str(LOCAL_BGE_MODEL_DIR) if LOCAL_BGE_MODEL_DIR.is_dir() else ""
 DEFAULT_FUSION_CONFIG = load_fusion_weight_config()
+FAIRCV_SANITIZER_VERSION = "2026-10-19-v2"
 
 
 @st.cache_resource(show_spinner=False)
@@ -158,8 +159,9 @@ def load_example_catalog() -> tuple[dict[str, object], ...]:
 
 
 @st.cache_data(show_spinner=False, ttl=24 * 60 * 60)
-def fetch_example_resume(row_index: int) -> str:
+def fetch_example_resume(row_index: int, sanitizer_version: str = FAIRCV_SANITIZER_VERSION) -> str:
     """按源行号读取 FairCV，并沿用受保护字段移除逻辑。"""
+    del sanitizer_version  # 仅用于让 Streamlit 在清洗规则升级后失效旧缓存。
     last_error: Exception | None = None
     batch = None
     for attempt in range(3):
@@ -194,7 +196,9 @@ def load_example(example: dict[str, object] | None = None) -> None:
         st.session_state["resume_text"] = SAMPLE_RESUME_PATH.read_text(encoding="utf-8")
         st.session_state["jd_text"] = SAMPLE_JD_PATH.read_text(encoding="utf-8")
     else:
-        resume = fetch_example_resume(int(example["source_row_index"]))
+        resume = fetch_example_resume(
+            int(example["source_row_index"]), FAIRCV_SANITIZER_VERSION
+        )
         st.session_state["resume_text"] = resume
         st.session_state["jd_text"] = find_example_jd(str(example["default_jd_id"]))
     st.session_state.pop("resume_file_info", None)
