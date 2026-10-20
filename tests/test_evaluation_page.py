@@ -12,5 +12,5 @@ def test_evaluation_page_runs_without_exception() -> None:
     page = AppTest.from_file(str(PAGE_PATH), default_timeout=15).run()
     assert not page.exception
     assert page.title[0].value == "人工标注评估实验"
-    assert page.metric[0].value == "80/300"
-    assert any("阶段性结果" in warning.value for warning in page.warning)
+    assert page.metric[0].value == "300/300"
+    assert any("全部 300 对" in success.value for success in page.success)

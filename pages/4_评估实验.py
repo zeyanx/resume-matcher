@@ -141,6 +141,7 @@ def calculate_experiment(path_text: str, modified_ns: int) -> dict[str, object]:
         "test_count": len(test_cases),
         "test_query_count": len(query_max_label),
         "test_queries_without_relevant": sum(value < 2 for value in query_max_label.values()),
+        "test_positive_count": sum(case.relevance_label >= 2 for case in test_cases),
         "job_categories": test_categories,
         "data_statuses": sorted({case.data_status for case in cases}),
     }
@@ -193,11 +194,13 @@ def main() -> None:
     st.progress(labeled_count / total_count, text=f"标注进度 {labeled_count}/{total_count}")
 
     st.warning(
-        "当前是阶段性结果：简历来自 FairCV 合成数据，JD 来自公开数据，标签由人工给出。"
+        "简历来自 FairCV 合成数据，JD 来自公开数据，标签由人工给出。"
         "结果只适用于该固定基准，不能解释为真实招聘准确率或录用概率。"
     )
     if pending_count:
         st.info(f"仍有 {pending_count} 对待标注；本页自动忽略这些记录，只计算已完成人工标注的子集。")
+    else:
+        st.success(f"全部 {total_count} 对配对均已完成人工标注，本页使用完整固定测试集计算指标。")
 
     label_counts = (
         labeled.assign(relevance_label=labeled["relevance_label"].astype(int))
@@ -206,7 +209,10 @@ def main() -> None:
         .rename(columns={"size": "数量", "split": "数据切分", "relevance_label": "人工标签"})
     )
     if 3 not in set(label_counts["人工标签"]):
-        st.warning("当前 80 条标注中没有“3=高度匹配”样本，标签分布明显不均衡，指标需谨慎解释。")
+        st.warning(
+            f"当前 {labeled_count} 条标注中没有“3=高度匹配”样本，"
+            "标签分布明显不均衡，指标需谨慎解释。"
+        )
 
     st.subheader("人工标签分布")
     label_figure = px.bar(
@@ -261,9 +267,9 @@ def main() -> None:
     ranking_figure.update_yaxes(zeroline=True, zerolinewidth=1, zerolinecolor="#666")
     st.plotly_chart(ranking_figure, use_container_width=True)
     st.caption(
-        "测试集仅 20 对、4 个查询组；其中 "
+        f"测试集包含 {result['test_count']} 对、{result['test_query_count']} 个查询组；其中 "
         f"{result['test_queries_without_relevant']} 个查询组没有标签≥2的候选，"
-        "因此 NDCG@5、MRR 和相关系数只能作为当前阶段的初步结果。"
+        "NDCG@5、MRR 和相关系数应结合查询组数量与标签分布解释。"
     )
 
     st.subheader("阈值分类指标")
@@ -282,7 +288,7 @@ def main() -> None:
     )
     st.dataframe(classification.round(4), use_container_width=True, hide_index=True)
     st.caption(
-        "正类定义为人工标签≥2，预测阈值为 0.5。测试集正类只有 2 条，"
+        f"正类定义为人工标签≥2，预测阈值为 0.5。测试集正类有 {result['test_positive_count']} 条，"
         "Accuracy 可能被类别不平衡放大，应同时查看 Precision、Recall 和 F1。"
     )
 
@@ -324,8 +330,8 @@ def main() -> None:
     fusion_mae = float(metrics.loc[metrics["algorithm"] == "融合评分", "mae"].iloc[0])
     st.info(
         f"当前测试集 Spearman 最高的是 {best_names}（{best_spearman:.4f}）；"
-        f"融合评分 MAE 为 {fusion_mae:.4f}。这是小样本阶段性结果；"
-        "完成剩余标注并增加复核标注者后，应重新运行实验。"
+        f"融合评分 MAE 为 {fusion_mae:.4f}。当前已使用全部 {labeled_count} 条人工标签；"
+        "增加第二标注者复核后，仍应重新运行实验并报告一致性。"
     )
 
 

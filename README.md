@@ -116,8 +116,8 @@ python scripts\run_weight_experiment.py `
 ### FairCV + 公开中文 JD 人工标注基准
 
 `data/test_cases.csv` 包含 60 份 FairCV 合成简历、300 条公开中文 JD 和 300 个固定配对，
-按简历查询分组为 20% validation / 80% test。当前已有 80 条人工标签，其中 validation 60 条、
-test 20 条；剩余 220 条仍待标注。评估页面只筛选已标注记录，实时展示标签分布、权重搜索、
+按简历查询分组为 20% validation / 80% test。300 条均已完成人工标注，其中 validation 60 条、
+test 240 条。评估页面只筛选已标注记录，实时展示标签分布、权重搜索、
 TF-IDF/BGE/融合评分对比、分类别指标和误差案例。
 详细来源、许可、标注规则和复现命令见 `data/BENCHMARK_CARD.md`。
 
@@ -139,7 +139,7 @@ python evaluation\evaluate.py `
 
 输入文件标记为 `synthetic_demo` 时，程序会拒绝生成相关性、排序、分类指标和指标图。
 `--human-labeled-only` 会忽略 `pending_human` 行，但不会改变原有 validation/test 切分。
-当前结果是人工标注的“合成简历—公开 JD”小样本阶段性结果，不代表真实招聘准确率。
+当前结果是人工标注的“合成简历—公开 JD”固定基准结果，不代表真实招聘准确率。
 
 ## 运行测试
 
