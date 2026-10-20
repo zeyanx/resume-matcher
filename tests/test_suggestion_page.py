@@ -24,3 +24,5 @@ def test_suggestion_page_generates_advice_and_downloads() -> None:
     markdown_values = [element.value for element in page.markdown]
     assert any("核对并处理岗位缺失技能" in value for value in markdown_values)
     assert len(page.download_button) == 2
+    assert any(element.label == "你对本次简历修改建议的满意度" for element in page.slider)
+    assert any(button.label == "提交建议反馈" and button.disabled for button in page.button)

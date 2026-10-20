@@ -17,6 +17,12 @@ from utils.feedback_store import FeedbackStore, FeedbackStoreError  # noqa: E402
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="人工审核 ResumeMatcher 反馈。")
+    parser.add_argument(
+        "--feedback-type",
+        choices=["matching", "suggestion"],
+        default="matching",
+        help="审核匹配反馈或建议满意度反馈。",
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
     list_parser = subparsers.add_parser("list", help="列出记录摘要，不显示简历/JD正文。")
     list_parser.add_argument("--status", choices=["pending", "approved", "rejected"])
@@ -40,23 +46,39 @@ def main() -> int:
             print(f"已删除 {store.purge_expired()} 条过期记录。")
             return 0
         if args.command == "list":
-            records = store.list_records(status=args.status, limit=args.limit)
+            records = (
+                store.list_suggestion_records(status=args.status, limit=args.limit)
+                if args.feedback_type == "suggestion"
+                else store.list_records(status=args.status, limit=args.limit)
+            )
             if not records:
                 print("没有记录。")
                 return 0
             for record in records:
                 comment = str(record["feedback_comment"]).replace("\n", " ")[:80]
-                print(
-                    f"{record['submission_id']} | {record['created_at']} | "
-                    f"{record['review_status']} | 标签={record['relevance_label']} | "
-                    f"帮助={record['helpfulness_rating']} | 文本授权="
-                    f"{bool(record['research_text_consent'])} | 备注={comment}"
-                )
+                if args.feedback_type == "suggestion":
+                    print(
+                        f"{record['submission_id']} | {record['created_at']} | "
+                        f"{record['review_status']} | 满意度={record['satisfaction_rating']} | "
+                        f"有用类别={record['helpful_kinds_json']} | 文本授权="
+                        f"{bool(record['research_text_consent'])} | 备注={comment}"
+                    )
+                else:
+                    print(
+                        f"{record['submission_id']} | {record['created_at']} | "
+                        f"{record['review_status']} | 标签={record['relevance_label']} | "
+                        f"帮助={record['helpfulness_rating']} | 文本授权="
+                        f"{bool(record['research_text_consent'])} | 备注={comment}"
+                    )
             return 0
         status = "approved" if args.command == "approve" else (
             "rejected" if args.command == "reject" else "pending"
         )
-        changed = store.set_review_status(args.submission_id, status)
+        changed = (
+            store.set_suggestion_review_status(args.submission_id, status)
+            if args.feedback_type == "suggestion"
+            else store.set_review_status(args.submission_id, status)
+        )
         print("已更新。" if changed else "未找到记录。")
         return 0 if changed else 1
     except FeedbackStoreError as exc:

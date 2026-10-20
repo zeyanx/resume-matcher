@@ -1,0 +1,8 @@
+{
+  "version": "baseline-v1",
+  "status": "baseline_not_learned",
+  "source": "规则基线；等待至少 30 条人工审核通过的满意度反馈",
+  "learned_from": 0,
+  "minimum_approved_records": 30,
+  "kind_weights": {}
+}

@@ -4,6 +4,7 @@ from utils.feedback_store import (
     FeedbackStore,
     FeedbackStoreError,
     FeedbackSubmission,
+    SuggestionFeedbackSubmission,
     redact_personal_data,
 )
 
@@ -29,6 +30,29 @@ def build_submission(**changes):
     }
     values.update(changes)
     return FeedbackSubmission(**values)
+
+
+def build_suggestion_submission(**changes):
+    values = {
+        "satisfaction_rating": 4,
+        "suggestion_kinds": ["missing_skills", "missing_sections"],
+        "suggestion_priorities": ["高", "中"],
+        "helpful_kinds": ["missing_skills"],
+        "feedback_comment": "建议有帮助，邮箱 test@example.com",
+        "skill_coverage": 0.5,
+        "experience_score": 0.4,
+        "missing_skill_count": 2,
+        "missing_experience_count": 1,
+        "resume_length": 500,
+        "jd_length": 300,
+        "suggestion_policy_version": "baseline-v1",
+        "policy_consent": True,
+        "research_text_consent": False,
+        "resume_text": "张三 13800138000",
+        "jd_text": "需要 Python",
+    }
+    values.update(changes)
+    return SuggestionFeedbackSubmission(**values)
 
 
 @pytest.fixture()
@@ -88,3 +112,28 @@ def test_redaction_covers_common_identifiers():
     assert "11010519491231002X" not in redacted
     assert "a.b+c@example.cn" not in redacted
     assert "13912345678" not in redacted
+
+
+def test_suggestion_feedback_is_separate_and_requires_review(store):
+    receipt = store.submit_suggestion_feedback(build_suggestion_submission())
+    rows = store.list_suggestion_records()
+    assert len(rows) == 1
+    assert rows[0]["satisfaction_rating"] == 4
+    assert rows[0]["resume_text_redacted"] is None
+    assert "test@example.com" not in rows[0]["feedback_comment"]
+    assert store.approved_suggestion_learning_rows() == []
+    assert store.set_suggestion_review_status(receipt.submission_id, "approved")
+    assert len(store.approved_suggestion_learning_rows()) == 1
+
+
+def test_deletion_token_also_removes_suggestion_feedback(store):
+    receipt = store.submit_suggestion_feedback(build_suggestion_submission())
+    assert store.delete_by_token(receipt.deletion_token)
+    assert store.list_suggestion_records() == []
+
+
+def test_suggestion_feedback_rejects_unknown_helpful_kind(store):
+    with pytest.raises(FeedbackStoreError, match="当前展示"):
+        store.submit_suggestion_feedback(
+            build_suggestion_submission(helpful_kinds=["not_displayed"])
+        )

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from typing import Mapping
 
 from models.experience_matcher import ExperienceMatchResult
 from utils.skill_extractor import SkillGapAnalysis
@@ -17,6 +18,7 @@ class ResumeSuggestion:
     action: str
     basis: str
     priority: str
+    kind: str = "general"
 
 
 def _join(items: tuple[str, ...], limit: int = 6) -> str:
@@ -33,6 +35,7 @@ def generate_resume_suggestions(
     experience_analysis: ExperienceMatchResult,
     minimum: int = 3,
     maximum: int = 5,
+    kind_weights: Mapping[str, float] | None = None,
 ) -> tuple[ResumeSuggestion, ...]:
     """生成 3–5 条可操作建议，且不把缺失内容写成已有经历。"""
     if minimum < 1 or maximum < minimum:
@@ -51,6 +54,7 @@ def generate_resume_suggestions(
                 ),
                 basis=f"技能差距：{missing}",
                 priority="高",
+                kind="missing_skills",
             )
         )
 
@@ -65,6 +69,7 @@ def generate_resume_suggestions(
                 ),
                 basis=f"未覆盖的经历或职责关键词：{missing}",
                 priority="高",
+                kind="missing_experience",
             )
         )
 
@@ -78,6 +83,7 @@ def generate_resume_suggestions(
                 ),
                 basis=f"岗位技能覆盖率：{skill_analysis.coverage_rate * 100:.2f}%",
                 priority="高",
+                kind="low_skill_coverage",
             )
         )
 
@@ -94,6 +100,7 @@ def generate_resume_suggestions(
                 ),
                 basis=f"未识别栏目：{names}",
                 priority="中",
+                kind="missing_sections",
             )
         )
 
@@ -107,6 +114,7 @@ def generate_resume_suggestions(
                 ),
                 basis="简历文本未检测到数字或百分比",
                 priority="中",
+                kind="missing_quantification",
             )
         )
 
@@ -121,6 +129,7 @@ def generate_resume_suggestions(
                 ),
                 basis=f"已覆盖的经历关键词：{matched}",
                 priority="中",
+                kind="matched_experience_evidence",
             )
         )
 
@@ -130,18 +139,21 @@ def generate_resume_suggestions(
             action="检查求职意向是否与当前 JD 的岗位方向一致，只调整真实求职方向，不修改或虚构既有经历。",
             basis="通用结构检查",
             priority="低",
+            kind="job_alignment",
         ),
         ResumeSuggestion(
             title="逐条校验技能证据",
             action="对技能区的每项技能，确认正文中至少有一处真实项目、课程或工作证据；无法说明使用场景的技能应谨慎保留。",
             basis="技能证据一致性检查",
             priority="中",
+            kind="skill_evidence",
         ),
         ResumeSuggestion(
             title="压缩空泛自我评价",
             action="将无法验证的形容词替换为真实行动或产出；若没有相应事实，就保持简洁，不添加未经证实的能力。",
             basis="可验证性检查",
             priority="低",
+            kind="remove_vague_claims",
         ),
     )
     existing_titles = {item.title for item in suggestions}
@@ -151,5 +163,17 @@ def generate_resume_suggestions(
         if fallback.title not in existing_titles:
             suggestions.append(fallback)
             existing_titles.add(fallback.title)
+
+    if kind_weights:
+        priority_scores = {"高": 3.0, "中": 2.0, "低": 1.0}
+        suggestions = sorted(
+            enumerate(suggestions),
+            key=lambda pair: (
+                -priority_scores.get(pair[1].priority, 1.0)
+                * float(kind_weights.get(pair[1].kind, 1.0)),
+                pair[0],
+            ),
+        )
+        suggestions = [item for _, item in suggestions]
 
     return tuple(suggestions[:maximum])

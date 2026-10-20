@@ -44,3 +44,20 @@ def test_suggestions_have_fallbacks_when_no_gap_exists() -> None:
     )
     assert 3 <= len(suggestions) <= 5
     assert len({item.title for item in suggestions}) == len(suggestions)
+
+
+def test_approved_kind_weights_can_change_suggestion_order() -> None:
+    resume = "技能：Python。项目经历：完成接口开发。"
+    jd = "要求 Python、Docker，负责接口开发、部署和测试。"
+    skills = analyze_skill_gap(resume, jd)
+    experience = calculate_experience_match(resume, jd)
+    baseline = generate_resume_suggestions(resume, jd, skills, experience)
+    reranked = generate_resume_suggestions(
+        resume,
+        jd,
+        skills,
+        experience,
+        kind_weights={"missing_skills": 0.5, "missing_experience": 1.5},
+    )
+    assert baseline[0].kind == "missing_skills"
+    assert reranked[0].kind == "missing_experience"

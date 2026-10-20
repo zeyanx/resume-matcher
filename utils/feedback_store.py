@@ -37,6 +37,7 @@ MAX_TEXT_LENGTH = 50_000
 MAX_COMMENT_LENGTH = 2_000
 ALLOWED_SCORE_NAMES = {"tfidf", "semantic", "skill", "experience", "fusion"}
 ALLOWED_REVIEW_STATUSES = {"pending", "approved", "rejected"}
+ALLOWED_PRIORITIES = {"高", "中", "低"}
 
 
 class FeedbackStoreError(RuntimeError):
@@ -51,6 +52,29 @@ class FeedbackSubmission:
     scores: Mapping[str, float | None]
     matched_skills: Sequence[str]
     missing_skills: Sequence[str]
+    policy_consent: bool
+    research_text_consent: bool = False
+    resume_text: str = ""
+    jd_text: str = ""
+    consent_version: str = "2026-10-19-v1"
+
+
+@dataclass(frozen=True, slots=True)
+class SuggestionFeedbackSubmission:
+    """用户对一组简历修改建议的自愿满意度反馈。"""
+
+    satisfaction_rating: int
+    suggestion_kinds: Sequence[str]
+    suggestion_priorities: Sequence[str]
+    helpful_kinds: Sequence[str]
+    feedback_comment: str
+    skill_coverage: float | None
+    experience_score: float | None
+    missing_skill_count: int
+    missing_experience_count: int
+    resume_length: int
+    jd_length: int
+    suggestion_policy_version: str
     policy_consent: bool
     research_text_consent: bool = False
     resume_text: str = ""
@@ -88,6 +112,15 @@ def _safe_json_list(values: Sequence[str]) -> str:
     return json.dumps(cleaned[:100], ensure_ascii=False)
 
 
+def _safe_kinds(values: Sequence[str]) -> tuple[str, ...]:
+    cleaned = tuple(str(value).strip()[:64] for value in values if str(value).strip())
+    if not cleaned or len(cleaned) > 10:
+        raise FeedbackStoreError("建议类别数量必须在 1 到 10 之间。")
+    if any(not re.fullmatch(r"[a-z0-9_]+", value) for value in cleaned):
+        raise FeedbackStoreError("建议类别格式无效。")
+    return cleaned
+
+
 class FeedbackStore:
     """SQLAlchemy 后端；支持本地 SQLite 测试和远程 PostgreSQL 生产库。"""
 
@@ -121,6 +154,31 @@ class FeedbackStore:
             Column("fusion_score", Float, nullable=True),
             Column("matched_skills_json", Text, nullable=False),
             Column("missing_skills_json", Text, nullable=False),
+            Column("research_text_consent", Integer, nullable=False),
+            Column("resume_text_redacted", Text, nullable=True),
+            Column("jd_text_redacted", Text, nullable=True),
+            Column("consent_version", String(64), nullable=False),
+            Column("review_status", String(16), nullable=False),
+            Column("deletion_token_hash", String(64), nullable=False, unique=True),
+        )
+        self.suggestion_feedback = Table(
+            "suggestion_feedback",
+            self.metadata,
+            Column("submission_id", String(36), primary_key=True),
+            Column("created_at", DateTime(timezone=True), nullable=False),
+            Column("split", String(16), nullable=False),
+            Column("satisfaction_rating", Integer, nullable=False),
+            Column("suggestion_kinds_json", Text, nullable=False),
+            Column("suggestion_priorities_json", Text, nullable=False),
+            Column("helpful_kinds_json", Text, nullable=False),
+            Column("feedback_comment", Text, nullable=False, default=""),
+            Column("skill_coverage", Float, nullable=True),
+            Column("experience_score", Float, nullable=True),
+            Column("missing_skill_count", Integer, nullable=False),
+            Column("missing_experience_count", Integer, nullable=False),
+            Column("resume_length", Integer, nullable=False),
+            Column("jd_length", Integer, nullable=False),
+            Column("suggestion_policy_version", String(64), nullable=False),
             Column("research_text_consent", Integer, nullable=False),
             Column("resume_text_redacted", Text, nullable=True),
             Column("jd_text_redacted", Text, nullable=True),
@@ -190,16 +248,89 @@ class FeedbackStore:
             raise FeedbackStoreError("反馈保存失败，请稍后重试。") from exc
         return SubmissionReceipt(submission_id, deletion_token, values["split"])
 
+    def submit_suggestion_feedback(
+        self, submission: SuggestionFeedbackSubmission
+    ) -> SubmissionReceipt:
+        """保存建议满意度；正文只有在第二次明确授权后才保存。"""
+        if not submission.policy_consent:
+            raise FeedbackStoreError("提交前必须明确同意数据使用说明。")
+        if submission.satisfaction_rating not in range(1, 6):
+            raise FeedbackStoreError("建议满意度必须是 1 到 5。")
+        suggestion_kinds = _safe_kinds(submission.suggestion_kinds)
+        if len(submission.suggestion_priorities) != len(suggestion_kinds):
+            raise FeedbackStoreError("建议优先级与建议类别数量不一致。")
+        priorities = tuple(str(value).strip() for value in submission.suggestion_priorities)
+        if any(value not in ALLOWED_PRIORITIES for value in priorities):
+            raise FeedbackStoreError("建议优先级格式无效。")
+        helpful_kinds = tuple(dict.fromkeys(_safe_kinds(submission.helpful_kinds))) if submission.helpful_kinds else ()
+        if any(kind not in suggestion_kinds for kind in helpful_kinds):
+            raise FeedbackStoreError("有用建议必须来自当前展示的建议。")
+
+        def optional_score(value: float | None, name: str) -> float | None:
+            if value is None:
+                return None
+            numeric = float(value)
+            if not math.isfinite(numeric) or not 0 <= numeric <= 1:
+                raise FeedbackStoreError(f"{name} 必须在 0 到 1 之间。")
+            return numeric
+
+        counts = (
+            submission.missing_skill_count,
+            submission.missing_experience_count,
+            submission.resume_length,
+            submission.jd_length,
+        )
+        if any(int(value) < 0 for value in counts):
+            raise FeedbackStoreError("反馈特征计数不能为负数。")
+
+        submission_id = str(uuid.uuid4())
+        deletion_token = secrets.token_urlsafe(24)
+        store_text = bool(submission.research_text_consent)
+        values = {
+            "submission_id": submission_id,
+            "created_at": datetime.now(timezone.utc),
+            "split": _deterministic_split(submission_id),
+            "satisfaction_rating": submission.satisfaction_rating,
+            "suggestion_kinds_json": json.dumps(suggestion_kinds, ensure_ascii=False),
+            "suggestion_priorities_json": json.dumps(priorities, ensure_ascii=False),
+            "helpful_kinds_json": json.dumps(helpful_kinds, ensure_ascii=False),
+            "feedback_comment": redact_personal_data(submission.feedback_comment)[:MAX_COMMENT_LENGTH],
+            "skill_coverage": optional_score(submission.skill_coverage, "技能覆盖率"),
+            "experience_score": optional_score(submission.experience_score, "经历匹配分"),
+            "missing_skill_count": min(int(submission.missing_skill_count), 10_000),
+            "missing_experience_count": min(int(submission.missing_experience_count), 10_000),
+            "resume_length": min(int(submission.resume_length), MAX_TEXT_LENGTH),
+            "jd_length": min(int(submission.jd_length), MAX_TEXT_LENGTH),
+            "suggestion_policy_version": submission.suggestion_policy_version[:64],
+            "research_text_consent": int(store_text),
+            "resume_text_redacted": redact_personal_data(submission.resume_text)[:MAX_TEXT_LENGTH] if store_text else None,
+            "jd_text_redacted": redact_personal_data(submission.jd_text)[:MAX_TEXT_LENGTH] if store_text else None,
+            "consent_version": submission.consent_version[:64],
+            "review_status": "pending",
+            "deletion_token_hash": _token_hash(deletion_token),
+        }
+        try:
+            with self.engine.begin() as connection:
+                connection.execute(self.suggestion_feedback.insert().values(**values))
+        except Exception as exc:
+            raise FeedbackStoreError("建议满意度保存失败，请稍后重试。") from exc
+        return SubmissionReceipt(submission_id, deletion_token, values["split"])
+
     def delete_by_token(self, deletion_token: str) -> bool:
         token = deletion_token.strip()
         if len(token) < 16:
             return False
         try:
             with self.engine.begin() as connection:
-                result = connection.execute(
+                match_result = connection.execute(
                     delete(self.feedback).where(self.feedback.c.deletion_token_hash == _token_hash(token))
                 )
-                return bool(result.rowcount)
+                suggestion_result = connection.execute(
+                    delete(self.suggestion_feedback).where(
+                        self.suggestion_feedback.c.deletion_token_hash == _token_hash(token)
+                    )
+                )
+                return bool((match_result.rowcount or 0) + (suggestion_result.rowcount or 0))
         except Exception as exc:
             raise FeedbackStoreError("删除请求执行失败，请联系隐私联系人。") from exc
 
@@ -207,8 +338,11 @@ class FeedbackStore:
         cutoff = datetime.now(timezone.utc) - timedelta(days=self.retention_days)
         try:
             with self.engine.begin() as connection:
-                result = connection.execute(delete(self.feedback).where(self.feedback.c.created_at < cutoff))
-                return int(result.rowcount or 0)
+                match_result = connection.execute(delete(self.feedback).where(self.feedback.c.created_at < cutoff))
+                suggestion_result = connection.execute(
+                    delete(self.suggestion_feedback).where(self.suggestion_feedback.c.created_at < cutoff)
+                )
+                return int((match_result.rowcount or 0) + (suggestion_result.rowcount or 0))
         except Exception as exc:
             raise FeedbackStoreError("过期数据清理失败。") from exc
 
@@ -253,3 +387,44 @@ class FeedbackStore:
                 return [dict(row) for row in connection.execute(query).mappings()]
         except Exception as exc:
             raise FeedbackStoreError("无法读取已审核训练记录。") from exc
+
+    def set_suggestion_review_status(self, submission_id: str, status: str) -> bool:
+        if status not in ALLOWED_REVIEW_STATUSES:
+            raise FeedbackStoreError("审核状态必须是 pending、approved 或 rejected。")
+        try:
+            with self.engine.begin() as connection:
+                result = connection.execute(
+                    update(self.suggestion_feedback)
+                    .where(self.suggestion_feedback.c.submission_id == submission_id)
+                    .values(review_status=status)
+                )
+                return bool(result.rowcount)
+        except Exception as exc:
+            raise FeedbackStoreError("建议反馈审核状态更新失败。") from exc
+
+    def list_suggestion_records(
+        self, status: str | None = None, limit: int = 100
+    ) -> list[dict[str, object]]:
+        query = select(self.suggestion_feedback)
+        if status is not None:
+            if status not in ALLOWED_REVIEW_STATUSES:
+                raise FeedbackStoreError("未知审核状态。")
+            query = query.where(self.suggestion_feedback.c.review_status == status)
+        query = query.order_by(self.suggestion_feedback.c.created_at.desc()).limit(
+            min(max(limit, 1), 1000)
+        )
+        try:
+            with self.engine.connect() as connection:
+                return [dict(row) for row in connection.execute(query).mappings()]
+        except Exception as exc:
+            raise FeedbackStoreError("无法读取建议满意度记录。") from exc
+
+    def approved_suggestion_learning_rows(self) -> list[dict[str, object]]:
+        query = select(self.suggestion_feedback).where(
+            self.suggestion_feedback.c.review_status == "approved"
+        )
+        try:
+            with self.engine.connect() as connection:
+                return [dict(row) for row in connection.execute(query).mappings()]
+        except Exception as exc:
+            raise FeedbackStoreError("无法读取已审核建议学习记录。") from exc

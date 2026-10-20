@@ -105,8 +105,11 @@ python scripts\run_weight_experiment.py `
 - 对缺失技能使用“若确实掌握再补充证据”的条件表达；
 - 下载 UTF-8 Markdown 报告或带 BOM 的 TXT 报告；
 - 在报告中查看生成时间、各项得分、技能差距、经历关键词、建议和算法说明。
+- 对建议给出 1–5 分满意度，并多选真正有帮助的建议项；未配置反馈数据库时表单可见但不可提交。
 
 建议由本地确定性规则和模板生成，不调用大语言模型 API。报告不附带完整简历或 JD 正文，以减少不必要的个人信息复制。
+生成结果保留在当前会话中，评分交互不会让建议消失。只有状态为 `approved` 的建议学习策略才会改变排序；
+默认 `config/suggestion_policy.json` 是未学习的规则基线。
 
 ## 评估实验
 
@@ -164,9 +167,14 @@ CONSENT_VERSION = "2026-10-19-v1"
 
 不要提交真实 `.streamlit/secrets.toml`。完整上线检查见 `DEPLOYMENT.md`，数据规则见 `PRIVACY.md`。
 
-反馈默认只保存派生分数与人工标签；保存脱敏简历/JD 需要用户第二次单独授权。每条反馈都会生成
-删除码。管理员先运行 `scripts/review_feedback.py` 人工审核；`scripts/learn_from_feedback.py` 只读取
-审核通过且子分数完整的记录，至少 30 条才生成候选权重，并且不会自动覆盖线上配置。
+反馈默认只保存派生分数与人工标签；建议反馈另存满意度、所选有用建议类别和上下文派生特征；
+保存脱敏简历/JD 需要用户第二次单独授权。每条反馈都会生成删除码。
+
+管理员先运行 `scripts/review_feedback.py` 人工审核。匹配反馈由 `scripts/learn_from_feedback.py` 生成候选融合权重；
+建议反馈使用 `scripts/review_feedback.py --feedback-type suggestion ...` 审核，再由
+`scripts/learn_suggestions_from_feedback.py` 训练 Logistic Regression“有用建议”分类器并生成候选排序策略。
+两条学习流程都至少需要 30 条审核通过的记录并保留独立测试集，且不会自动覆盖线上配置。
+建议候选策略人工复核后，使用 `scripts/publish_suggestion_policy.py <候选文件> --confirm-reviewed` 发布。
 
 ## FairCV 基础数据
 

@@ -33,7 +33,10 @@
 
 ## 5. 审核与离线学习
 
-使用 `scripts/review_feedback.py` 审核记录，再运行 `scripts/learn_from_feedback.py`。学习结果输出到
-`reports/feedback_learning/`，不会修改 `config/fusion_weights.json`，必须人工复核后才能决定是否发布。
+使用 `scripts/review_feedback.py` 审核匹配记录；建议满意度使用
+`scripts/review_feedback.py --feedback-type suggestion ...` 审核。匹配权重运行
+`scripts/learn_from_feedback.py`，建议排序运行 `scripts/learn_suggestions_from_feedback.py`。学习结果只写入
+`reports/` 下的候选文件，不会自动修改线上配置。人工复核建议候选策略后，可运行
+`scripts/publish_suggestion_policy.py <候选文件> --confirm-reviewed` 发布；应用仅加载状态为 `approved` 的策略。
 建议通过数据库平台的计划任务定期执行 `python scripts/review_feedback.py purge`；新反馈提交时应用也会
 尝试清理一次过期记录。
