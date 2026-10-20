@@ -36,6 +36,7 @@ LOCAL_BGE_MODEL_DIR = PROJECT_ROOT / "models_cache" / "bge-small-zh-v1.5"
 DEFAULT_LOCAL_BGE_PATH = str(LOCAL_BGE_MODEL_DIR) if LOCAL_BGE_MODEL_DIR.is_dir() else ""
 DEFAULT_FUSION_CONFIG = load_fusion_weight_config()
 FAIRCV_SANITIZER_VERSION = "2026-10-19-v3"
+RELEASE_VERSION = "2026-10-20-human-evaluation-suggestion-feedback-v1"
 
 
 @st.cache_resource(show_spinner=False)
@@ -239,6 +240,7 @@ def main() -> None:
         else:
             st.button("载入内置离线示例", on_click=load_example, use_container_width=True)
         st.caption("示例简历来自 FairCV 合成数据，仅用于课程演示，不代表真实求职者。")
+        st.caption(f"版本：{RELEASE_VERSION}")
         st.divider()
         st.subheader("BGE 模型")
         enable_bge = st.toggle("启用 BGE 语义匹配", value=True)
