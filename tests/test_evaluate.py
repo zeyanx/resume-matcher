@@ -1,5 +1,6 @@
 """阶段 7 完整评估流程测试。"""
 
+import csv
 import json
 from dataclasses import replace
 from pathlib import Path
@@ -86,4 +87,35 @@ def test_invalid_evaluation_file_is_rejected(tmp_path) -> None:
     path = tmp_path / "empty.csv"
     path.write_text("case_id,query_id\n", encoding="utf-8")
     with pytest.raises(ValueError, match="为空"):
+        load_evaluation_cases(path)
+
+
+def test_partial_annotation_file_can_filter_human_labels(tmp_path) -> None:
+    path = tmp_path / "partial.csv"
+    fieldnames = [
+        "case_id",
+        "query_id",
+        "split",
+        "job_category",
+        "relevance_label",
+        "label_status",
+        "tfidf_score",
+        "semantic_score",
+        "skill_score",
+        "experience_score",
+        "data_status",
+    ]
+    rows = [
+        ["v1", "q1", "validation", "前端", 2, "human_labeled", 0.2, 0.7, 0.8, 0.4, "human_labeled"],
+        ["t1", "q2", "test", "后端", 1, "human_adjudicated", 0.1, 0.6, 0.5, 0.2, "human_labeled"],
+        ["t2", "q3", "test", "后端", "", "pending_human", 0.1, 0.5, 0.4, 0.1, "pending_human"],
+    ]
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.writer(handle)
+        writer.writerow(fieldnames)
+        writer.writerows(rows)
+
+    cases = load_evaluation_cases(path, human_labeled_only=True)
+    assert [case.case_id for case in cases] == ["v1", "t1"]
+    with pytest.raises(ValueError, match="尚未完成人工标注"):
         load_evaluation_cases(path)

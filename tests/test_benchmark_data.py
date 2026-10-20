@@ -25,7 +25,7 @@ def test_job_markup_parser_keeps_title_description_and_education() -> None:
     assert education == "本科及以上"
 
 
-def test_pending_benchmark_has_expected_fixed_structure() -> None:
+def test_partially_labeled_benchmark_has_expected_fixed_structure() -> None:
     with TEST_CASES.open("r", encoding="utf-8-sig", newline="") as handle:
         rows = list(csv.DictReader(handle))
     assert len(rows) == 300
@@ -33,8 +33,12 @@ def test_pending_benchmark_has_expected_fixed_structure() -> None:
     assert len({row["jd_id"] for row in rows}) == 300
     assert sum(row["split"] == "validation" for row in rows) == 60
     assert sum(row["split"] == "test" for row in rows) == 240
-    assert {row["label_status"] for row in rows} == {"pending_human"}
-    assert {row["relevance_label"] for row in rows} == {""}
+    assert sum(row["label_status"] == "human_labeled" for row in rows) == 80
+    assert sum(row["label_status"] == "pending_human" for row in rows) == 220
+    labeled = [row for row in rows if row["label_status"] == "human_labeled"]
+    assert sum(row["split"] == "validation" for row in labeled) == 60
+    assert sum(row["split"] == "test" for row in labeled) == 20
+    assert {row["relevance_label"] for row in labeled} == {"0", "1", "2"}
     assert all(row["jd_text"].startswith("岗位名称：") for row in rows)
     for field in ("tfidf_score", "semantic_score", "skill_score", "experience_score"):
         assert all(0 <= float(row[field]) <= 1 for row in rows)
@@ -43,6 +47,9 @@ def test_pending_benchmark_has_expected_fixed_structure() -> None:
 def test_pending_benchmark_cannot_be_reported_as_formal_evaluation() -> None:
     with pytest.raises(ValueError, match="尚未完成人工标注"):
         load_evaluation_cases(TEST_CASES)
+
+    labeled_cases = load_evaluation_cases(TEST_CASES, human_labeled_only=True)
+    assert len(labeled_cases) == 80
 
 
 def test_five_faircv_examples_are_source_references_not_raw_resumes() -> None:

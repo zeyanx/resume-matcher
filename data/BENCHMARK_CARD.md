@@ -7,11 +7,12 @@
 - 公开中文 JD：300 条，每条只用于一个配对
 - 配对：300 条；每份简历对应 5 个 JD
 - 固定切分：验证集 60 条（12 个简历查询），测试集 240 条（48 个简历查询）
-- 标签状态：`pending_human`
+- 标签状态：80 条 `human_labeled`，220 条 `pending_human`
 
 `data/test_cases.csv` 已包含 TF-IDF、BGE、技能覆盖和经历覆盖子分数，但
-`relevance_label` 故意留空。模型分数只用于构造难度不同的候选池，不能当作人工标签。
-因此当前不能报告 Spearman、NDCG@5、MRR 或“最优融合权重”。
+只有人工标注完成的 80 条才进入当前阶段评估：validation 60 条（12 个查询组），
+test 20 条（4 个查询组）。标签分布为 0:57、1:14、2:9、3:0；剩余 220 条继续保留为空。
+模型分数只用于计算算法预测，不能替代人工标签。
 
 ## 数据来源
 
@@ -34,13 +35,14 @@
    - 3：岗位方向、核心技能和主要经历高度一致。
 3. 使用匿名代号，保存后定期下载 CSV。
 4. 建议两名标注者独立完成，再对分歧样本复核并标为 `human_adjudicated`。
-5. 只有所有标签均为 `human_labeled` 或 `human_adjudicated` 后，才能运行正式评估。
+5. 阶段性评估可使用 `--human-labeled-only`，但必须报告完成度和标签分布；全部标注及复核完成后再形成最终结论。
 
 ## 运行命令
 
 ```powershell
 python evaluation\evaluate.py `
-  --input data\test_cases_annotated.csv `
+  --input data\test_cases.csv `
+  --human-labeled-only `
   --output-dir reports\faircv_human_labeled `
   --weight-step 0.1
 ```

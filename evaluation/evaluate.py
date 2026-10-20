@@ -38,6 +38,7 @@ from models.fusion_matcher import FusionWeights, calculate_fusion_score  # noqa:
 
 
 ALGORITHMS = ("TF-IDF", "BGE", "融合评分", "去除技能的融合")
+HUMAN_LABEL_STATUSES = {"human_labeled", "human_adjudicated"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,8 +97,12 @@ class MetricResult:
     rmse: float
 
 
-def load_evaluation_cases(path: str | Path) -> tuple[EvaluationCase, ...]:
-    """读取完整评估 CSV；不自动或随机重划分数据。"""
+def load_evaluation_cases(
+    path: str | Path,
+    *,
+    human_labeled_only: bool = False,
+) -> tuple[EvaluationCase, ...]:
+    """读取评估 CSV；可只使用已完成人工标注的记录，不改变原切分。"""
     source = Path(path)
     try:
         with source.open("r", encoding="utf-8-sig", newline="") as handle:
@@ -109,10 +114,13 @@ def load_evaluation_cases(path: str | Path) -> tuple[EvaluationCase, ...]:
 
     cases: list[EvaluationCase] = []
     for line_number, row in enumerate(rows, start=2):
-        if not str(row.get("relevance_label", "")).strip():
-            raise ValueError(f"评估数据第 {line_number} 行尚未完成人工标注。")
         label_status = str(row.get("label_status", "")).strip()
-        if label_status and label_status not in {"human_labeled", "human_adjudicated"}:
+        label_text = str(row.get("relevance_label", "")).strip()
+        if human_labeled_only and label_status not in HUMAN_LABEL_STATUSES:
+            continue
+        if not label_text:
+            raise ValueError(f"评估数据第 {line_number} 行尚未完成人工标注。")
+        if label_status and label_status not in HUMAN_LABEL_STATUSES:
             raise ValueError(
                 f"评估数据第 {line_number} 行 label_status={label_status}，"
                 "只有真人标注可用于正式评估。"
@@ -134,6 +142,8 @@ def load_evaluation_cases(path: str | Path) -> tuple[EvaluationCase, ...]:
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise ValueError(f"评估数据第 {line_number} 行格式错误：{exc}") from exc
+    if not cases:
+        raise ValueError("评估数据中没有已完成人工标注的记录。")
     if len({case.case_id for case in cases}) != len(cases):
         raise ValueError("评估数据的 case_id 必须唯一。")
     if not any(case.split == "validation" for case in cases):
@@ -419,6 +429,7 @@ def run_evaluation(
 
     data_statuses = sorted({case.data_status for case in cases})
     has_synthetic_data = "synthetic_demo" in data_statuses
+    contains_synthetic_resume = any("synthetic_resume" in status for status in data_statuses)
     metrics_generated = not has_synthetic_data
     if metrics_generated:
         metrics = tuple(
@@ -483,10 +494,20 @@ def run_evaluation(
         "data_statuses": data_statuses,
         "valid_conclusion": metrics_generated,
         "metrics_generated": metrics_generated,
+        "evidence_scope": (
+            "human_labeled_synthetic_resume_benchmark"
+            if metrics_generated and contains_synthetic_resume
+            else "human_labeled_benchmark" if metrics_generated else "synthetic_demo_only"
+        ),
         "evidence_note": (
             "合成数据仅用于流程检查；best_config 中不保存可用于结论的正式权重。"
             if has_synthetic_data
-            else "指标来自提供的固定人工标注测试集。"
+            else (
+                "指标来自人工标注的 FairCV 合成简历与公开 JD 固定测试集；"
+                "只代表该基准，不代表真实招聘准确率。"
+                if contains_synthetic_resume
+                else "指标来自提供的固定人工标注测试集。"
+            )
         ),
     }
     config_path.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -514,7 +535,12 @@ def run_evaluation(
         "conclusion": (
             "尚未形成有效实验结论：当前只有合成演示数据，指标表仅保留表头。"
             if has_synthetic_data
-            else "指标来自提供的固定测试集；解释时仍需结合数据卡和标注质量。"
+            else (
+                "这是人工标注的 FairCV 合成简历—公开 JD 基准结果；"
+                "解释时需结合样本规模、标签分布和数据卡，不能外推为真实招聘准确率。"
+                if contains_synthetic_resume
+                else "指标来自提供的固定测试集；解释时仍需结合数据卡和标注质量。"
+            )
         ),
     }
     summary_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -537,12 +563,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=42, help="随机种子记录，默认 42。")
     parser.add_argument("--weight-step", type=float, default=0.1, help="权重网格步长。")
     parser.add_argument("--classification-threshold", type=float, default=0.5)
+    parser.add_argument(
+        "--human-labeled-only",
+        action="store_true",
+        help="忽略仍为 pending_human 的记录，只评估已完成人工标注的子集。",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    cases = load_evaluation_cases(args.input)
+    cases = load_evaluation_cases(args.input, human_labeled_only=args.human_labeled_only)
     outputs = run_evaluation(
         cases,
         args.output_dir,
